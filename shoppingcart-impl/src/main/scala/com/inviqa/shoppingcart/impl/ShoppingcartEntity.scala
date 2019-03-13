@@ -1,12 +1,11 @@
 package com.inviqa.shoppingcart.impl
 
-import java.time.LocalDateTime
-
 import akka.Done
 import com.lightbend.lagom.scaladsl.persistence.{AggregateEvent, AggregateEventTag, PersistentEntity}
 import com.lightbend.lagom.scaladsl.persistence.PersistentEntity.ReplyType
 import com.lightbend.lagom.scaladsl.playjson.{JsonSerializer, JsonSerializerRegistry}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json.{Format, JsValue, Json}
+import com.inviqa.shoppingcart.api.Product
 
 import scala.collection.immutable.Seq
 
@@ -19,7 +18,7 @@ class ShoppingcartEntity extends PersistentEntity {
   /**
     * The initial state. This is used if there is no snapshotted state to be found.
     */
-  override def initialState: ShoppingcartState = ShoppingcartState(List.empty[String])
+  override def initialState: ShoppingcartState = ShoppingcartState(List.empty[Product])
 
   /**
     * An entity can define different behaviours for different states, so the behaviour
@@ -41,7 +40,7 @@ class ShoppingcartEntity extends PersistentEntity {
         ) { _ =>
           context.reply(Done)
         }
-    }.onReadOnlyCommand[ShowCartCommand.type, List[String]] {
+    }.onReadOnlyCommand[ShowCartCommand.type, List[Product]] {
       case (ShowCartCommand, context, state) => context.reply(state.products)
     }.onEvent {
       case (AddedToCartEvent(product), state) =>
@@ -52,20 +51,50 @@ class ShoppingcartEntity extends PersistentEntity {
   }
 }
 
-final case class AddToCartCommand(product: String) extends ShoppingcartCommand[Done]
+final case class AddToCartCommand(product: Product) extends ShoppingcartCommand[Done]
 
-case object ShowCartCommand extends ShoppingcartCommand[List[String]]
+object AddToCartCommand {
+  implicit val format: Format[AddToCartCommand] = Json.format
 
-case class RemoveFromCartCommand(product: String) extends ShoppingcartCommand[Done]
+  def apply(product: JsValue): AddToCartCommand = {
+    product.validate[Product].asOpt match {
+      case Some(p) => new AddToCartCommand(p)
+      case None => throw new Exception(s"$product is not parsable")
+    }
+  }
+}
 
-case class AddedToCartEvent(product: String) extends ShoppingcartEvent
+case object ShowCartCommand extends ShoppingcartCommand[List[Product]]
 
-case class RemoveFromCartEvent(product: String) extends ShoppingcartEvent
+case class RemoveFromCartCommand(product: Product) extends ShoppingcartCommand[Done]
+
+object RemoveFromCartCommand {
+  implicit val format: Format[RemoveFromCartCommand] = Json.format
+
+  def apply(product: JsValue): RemoveFromCartCommand = {
+    product.validate[Product].asOpt match {
+      case Some(p) => new RemoveFromCartCommand(p)
+      case None => throw new Exception(s"$product is not parsable")
+    }
+  }
+}
+
+case class AddedToCartEvent(product: Product) extends ShoppingcartEvent
+
+object AddedToCartEvent {
+  implicit val format: Format[AddedToCartEvent] = Json.format
+}
+
+case class RemoveFromCartEvent(product: Product) extends ShoppingcartEvent
+
+object RemoveFromCartEvent {
+  implicit val format: Format[RemoveFromCartEvent] = Json.format
+}
 
 /**
   * The current state held by the persistent entity.
   */
-case class ShoppingcartState(products: List[String])
+case class ShoppingcartState(products: List[Product])
 
 object ShoppingcartState {
   implicit val format: Format[ShoppingcartState] = Json.format
@@ -98,6 +127,11 @@ sealed trait ShoppingcartCommand[R] extends ReplyType[R]
   */
 object ShoppingcartSerializerRegistry extends JsonSerializerRegistry {
   override def serializers: Seq[JsonSerializer[_]] = Seq(
-    JsonSerializer[ShoppingcartState]
+    JsonSerializer[ShoppingcartState],
+    JsonSerializer[RemoveFromCartEvent],
+    JsonSerializer[AddedToCartEvent],
+    JsonSerializer[RemoveFromCartCommand],
+    JsonSerializer[AddToCartCommand],
+    JsonSerializer[Product]
   )
 }

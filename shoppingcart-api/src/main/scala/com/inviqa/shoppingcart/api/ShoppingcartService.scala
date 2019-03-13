@@ -3,7 +3,7 @@ package com.inviqa.shoppingcart.api
 import akka.{Done, NotUsed}
 import com.lightbend.lagom.scaladsl.api.transport.Method
 import com.lightbend.lagom.scaladsl.api.{Descriptor, Service, ServiceCall}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json.{Format, JsValue, Json}
 
 /**
   * The ShoppingCart service interface.
@@ -15,7 +15,7 @@ trait ShoppingcartService extends Service {
 
   def addToCart(id: String): ServiceCall[AddToCartRequest, Done]
 
-  def showCart(id: String): ServiceCall[NotUsed, List[String]]
+  def showCart(id: String): ServiceCall[NotUsed, List[Product]]
 
   def removeFromCart(id: String): ServiceCall[RemoveFromCartRequest, Done]
 
@@ -33,13 +33,13 @@ trait ShoppingcartService extends Service {
   }
 }
 
-case class AddToCartRequest(product: String)
+case class AddToCartRequest(product: JsValue)
 
 object AddToCartRequest {
   implicit val format: Format[AddToCartRequest] = Json.format[AddToCartRequest]
 }
 
-case class RemoveFromCartRequest(product: String)
+case class RemoveFromCartRequest(product: JsValue)
 
 object RemoveFromCartRequest {
   implicit val format: Format[RemoveFromCartRequest] = Json.format[RemoveFromCartRequest]
